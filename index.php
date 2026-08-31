@@ -1,151 +1,181 @@
 <?php
-
 $host = 'localhost';
 $db   = 'user_db';
 $user = 'postgres';
 $pass = 'postgres';
 
-// === ПОДКЛЮЧЕНИЕ К БД С СОЗДАНИЕМ БАЗЫ И ТАБЛИЦЫ ===
-try {
-    // Сначала подключаемся без указания базы, чтобы создать её, если нет
-    $pdo = new PDO("pgsql:host=$host", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$dsn = "pgsql:host=$host;dbname=postgres";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
 
-    // Проверяем, существует ли база
+$message = '';
+$messageType = '';
+$pdo = null;
+
+try {
+    // 1. Подключаемся к стандартной БД postgres
+    $pdo = new PDO("pgsql:host=$host;dbname=postgres", $user, $pass, $options);
+    
+    // 2. Проверяем, существует ли база данных $db
     $stmt = $pdo->query("SELECT 1 FROM pg_database WHERE datname = '$db'");
-    if (!$stmt->fetch()) {
+    if (!$stmt->fetchColumn()) {
         $pdo->exec("CREATE DATABASE $db");
-        $message = "База данных '$db' создана.<br>";
-    } else {
-        $message = "";
+        $message = "База данных '$db' создана.";
+        $messageType = 'info';
     }
     
-    // Подключаемся к базе
-    $pdo = new PDO("pgsql:host=$host;dbname=$db", $user, $pass);
+    // 3. Переключаемся на базу $db
+    $pdo = new PDO("pgsql:host=$host;dbname=$db", $user, $pass, $options);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-
-    // Проверяем, существует ли таблица users
-    $stmt = $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_name = 'users'");
-    if (!$stmt->fetch()) {
-        $pdo->exec("CREATE TABLE users (
+    
+    // 4. Проверяем наличие таблицы users
+    try {
+        $pdo->query("SELECT 1 FROM users LIMIT 1");
+    } catch (PDOException $e) {
+        // Таблицы нет – создаём
+        $createSql = "CREATE TABLE users (
             user_id VARCHAR(100) PRIMARY KEY,
             username VARCHAR(100) NOT NULL
-        )");
-        $message .= "Таблица 'users' создана.";
+        )";
+        $pdo->exec($createSql);
+        $message = "Таблица 'users' создана.";
+        $messageType = 'info';
     }
 } catch (PDOException $e) {
-    $error = $e->getMessage();
-    if (strpos($error, 'роль "postgres" не существует') !== false) {
-        die("Ошибка: пользователь 'postgres' не существует. 
-             Создайте его командой: 
-             CREATE USER postgres WITH SUPERUSER PASSWORD 'postgres'; 
-             или измените параметры подключения в коде.");
-    } elseif (strpos($error, 'Connection refused') !== false) {
-        die("Ошибка: сервер PostgreSQL не запущен. Запустите его через службы Windows.");
-    } else {
-        die("Ошибка подключения: " . $error);
+    // Ошибка подключения или создания
+    $message = 'Ошибка: ' . $e->getMessage();
+    $messageType = 'error';
+    $pdo = null;
+}
+
+
+// --- ОБРАБОТКА ДЕЙСТВИЙ (только если $pdo существует) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($pdo)) {
+    // 1. Удаление
+    if (isset($_POST['action']) && $_POST['action'] === 'delete') {
+        $delete_id = trim((string)($_POST['user_id'] ?? ''));
+        if ($delete_id !== '' && strlen($delete_id) <= 100) {
+            try {
+                $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = :user_id");
+                $stmt->execute([':user_id' => $delete_id]);
+                $message = 'Пользователь удалён.';
+                $messageType = 'success';
+            } catch (PDOException $e) {
+                $message = 'Ошибка удаления.';
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Некорректный ID.';
+            $messageType = 'error';
+        }
+    }
+
+    // 2. Добавление или обновление
+    if (isset($_POST['action']) && in_array($_POST['action'], ['add', 'update'])) {
+        $user_id = trim((string)($_POST['user_id'] ?? ''));
+        $username = trim((string)($_POST['username'] ?? ''));
+
+        // Валидация
+        $errors = [];
+        if ($user_id === '' || strlen($user_id) > 100) {
+            $errors[] = 'ID пользователя должен быть указан и не превышать 100 символов.';
+        }
+        if (strlen($username) === 0 || strlen($username) > 100) {
+            $errors[] = 'Имя пользователя должно быть от 1 до 100 символов.';
+        }
+
+        if (empty($errors)) {
+            try {
+                if ($_POST['action'] === 'add') {
+                    // Добавление
+                    $sql = "INSERT INTO users (user_id, username) VALUES (:user_id, :username)";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        ':user_id' => $user_id,
+                        ':username' => $username,
+                    ]);
+                    $message = 'Пользователь успешно добавлен!';
+                    $messageType = 'success';
+                } else {
+                    // Обновление (редактирование)
+                    $edit_id = trim((string)($_POST['edit_id'] ?? ''));
+                    if ($edit_id === '' || strlen($edit_id) > 100) {
+                        throw new Exception('Неверный ID для редактирования.');
+                    }
+                    $sql = "UPDATE users SET username = :username WHERE user_id = :user_id";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                        ':user_id' => $edit_id,
+                        ':username' => $username,
+                    ]);
+                    $message = 'Пользователь обновлён!';
+                    $messageType = 'success';
+                }
+            } catch (PDOException $e) {
+                $errorCode = $e->errorInfo[1] ?? 0;
+                if ($errorCode === 23505) { // PostgreSQL unique violation
+                    $message = 'Ошибка: пользователь с таким ID уже существует.';
+                } else {
+                    $message = 'Произошла ошибка при сохранении. Попробуйте позже.';
+                }
+                $messageType = 'error';
+            } catch (Exception $e) {
+                $message = $e->getMessage();
+                $messageType = 'error';
+            }
+        } else {
+            $message = implode(' ', $errors);
+            $messageType = 'error';
+        }
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($pdo)) {
+    // Если POST-запрос, а подключения нет – сообщаем об ошибке
+    $message = 'Невозможно выполнить операцию: подключение к базе данных отсутствует.';
+    $messageType = 'error';
+}
+
+// --- ПОЛУЧЕНИЕ СПИСКА ПОЛЬЗОВАТЕЛЕЙ (только если $pdo существует) ---
+$users = [];
+if (isset($pdo)) {
+    try {
+        $stmt = $pdo->query("SELECT user_id, username FROM users ORDER BY user_id");
+        $users = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        // Таблица ещё не существует – игнорируем
+        $users = [];
     }
 }
 
-$message = $message ?? '';
-$messageType = 'success';
+// --- ПОДГОТОВКА ДАННЫХ ДЛЯ РЕДАКТИРОВАНИЯ (если передан GET-параметр edit) ---
+$editMode = false;
 $editUserId = null;
 $editUsername = '';
-
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
-
-// УДАЛЕНИЕ
-if ($action === 'delete' && isset($_POST['user_id'])) {
-    $userId = trim($_POST['user_id']);
-    if ($userId !== '') {
+if (isset($_GET['edit']) && isset($pdo)) {
+    $editId = trim((string)$_GET['edit']);
+    if ($editId !== '' && strlen($editId) <= 100) {
         try {
-            $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = :user_id");
-            $stmt->execute([':user_id' => $userId]);
-            $message = 'Пользователь удалён.';
-            $messageType = 'success';
+            $stmt = $pdo->prepare("SELECT user_id, username FROM users WHERE user_id = :user_id");
+            $stmt->execute([':user_id' => $editId]);
+            $userData = $stmt->fetch();
+            if ($userData) {
+                $editMode = true;
+                $editUserId = $userData['user_id'];
+                $editUsername = $userData['username'];
+            } else {
+                $message = 'Пользователь не найден.';
+                $messageType = 'error';
+            }
         } catch (PDOException $e) {
-            $message = 'Ошибка при удалении: ' . $e->getMessage();
+            $message = 'Ошибка загрузки данных.';
             $messageType = 'error';
         }
-    }
-}
-
-// РЕДАКТИРОВАНИЕ
-if (isset($_GET['edit']) && $_GET['edit'] !== '') {
-    $editUserId = trim($_GET['edit']);
-    try {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = :user_id");
-        $stmt->execute([':user_id' => $editUserId]);
-        $userData = $stmt->fetch();
-        if ($userData) {
-            $editUsername = $userData['username'];
-        } else {
-            $message = 'Пользователь не найден.';
-            $messageType = 'error';
-            $editUserId = null;
-        }
-    } catch (PDOException $e) {
-        $message = 'Ошибка загрузки данных: ' . $e->getMessage();
-        $messageType = 'error';
-        $editUserId = null;
-    }
-}
-
-// ДОБАВЛЕНИЕ И ОБНОВЛЕНИЕ
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'delete') {
-    $user_id = filter_input(INPUT_POST, 'user_id', FILTER_DEFAULT);
-    $username = trim((string)($_POST['username'] ?? ''));
-
-    if ($user_id === null || $user_id === '' || strlen($user_id) > 100) {
-        $message = 'ID пользователя должен быть указан и не превышать 100 символов.';
-        $messageType = 'error';
-    } elseif (strlen($username) === 0 || strlen($username) > 100) {
-        $message = 'Имя пользователя должно быть от 1 до 100 символов.';
-        $messageType = 'error';
     } else {
-        try {
-            if ($action === 'edit') {
-                $sql = "UPDATE users SET username = :username WHERE user_id = :user_id";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    ':user_id' => $user_id,
-                    ':username' => $username,
-                ]);
-                $message = 'Пользователь обновлён!';
-                $messageType = 'success';
-                $editUserId = null;
-                $editUsername = '';
-            } else {
-                $sql = "INSERT INTO users (user_id, username) VALUES (:user_id, :username)";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    ':user_id' => $user_id,
-                    ':username' => $username,
-                ]);
-                $message = 'Пользователь успешно добавлен!';
-                $messageType = 'success';
-            }
-        } catch (PDOException $e) {
-            $errorCode = $e->errorInfo[1] ?? 0;
-            if ($errorCode === 23505) {
-                $message = 'Ошибка: пользователь с таким ID уже существует.';
-            } else {
-                $message = 'Произошла ошибка при сохранении. Попробуйте позже.';
-            }
-            $messageType = 'error';
-        }
+        $message = 'Некорректный ID для редактирования.';
+        $messageType = 'error';
     }
-}
-
-// СПИСОК ПОЛЬЗОВАТЕЛЕЙ
-$users = [];
-try {
-    $stmt = $pdo->query("SELECT user_id, username FROM users ORDER BY user_id");
-    $users = $stmt->fetchAll();
-} catch (PDOException $e) {
-    $message = 'Ошибка загрузки списка пользователей: ' . $e->getMessage();
-    $messageType = 'error';
 }
 ?>
 <!DOCTYPE html>
@@ -154,33 +184,28 @@ try {
     <meta charset="UTF-8">
     <title>Управление пользователями</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        label { display: block; margin-top: 10px; }
+        input { padding: 6px; width: 250px; }
+        button { margin-top: 15px; padding: 8px 16px; cursor: pointer; }
         .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
         .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
-        .actions a, .actions button {
-            margin-right: 5px;
-            text-decoration: none;
-            padding: 4px 8px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: 18px;
-        }
-        .actions button { background: none; border: none; cursor: pointer; font-size: 18px; }
-        .form-inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
-        .form-inline input { padding: 6px; width: 200px; }
-        .form-inline button { padding: 6px 16px; }
-        .add-form { background: #f9f9f9; padding: 15px; border-radius: 6px; margin-top: 10px; }
-        .delete-form { display: inline; }
-        .info { background: #e7f3ff; padding: 10px; margin-top: 10px; border-radius: 4px; }
+        .actions a, .actions button { margin-right: 5px; }
+        .actions form { display: inline; }
+        .btn-edit, .btn-delete { padding: 4px 8px; text-decoration: none; border: none; cursor: pointer; }
+        .btn-edit { background: #007bff; color: #fff; border-radius: 4px; }
+        .btn-delete { background: #dc3545; color: #fff; border-radius: 4px; }
+        .btn-edit:hover { background: #0069d9; }
+        .btn-delete:hover { background: #c82333; }
     </style>
 </head>
 <body>
-    <h2>👥 Управление пользователями</h2>
+    <h2>Управление пользователями</h2>
 
     <?php if ($message): ?>
         <div class="message <?= $messageType ?>">
@@ -188,31 +213,32 @@ try {
         </div>
     <?php endif; ?>
 
-    <!-- Форма добавления/редактирования -->
-    <div class="add-form">
-        <h3><?= $editUserId ? '✏️ Редактировать пользователя' : '➕ Добавить пользователя' ?></h3>
-        <form action="?<?= $editUserId ? 'action=edit' : '' ?>" method="POST">
-            <?php if ($editUserId): ?>
-                <input type="hidden" name="action" value="edit">
-            <?php endif; ?>
-            <div class="form-inline">
-                <label for="user_id">ID:</label>
-                <input type="text" id="user_id" name="user_id" required 
-                       value="<?= htmlspecialchars($editUserId ?? '') ?>"
-                       <?= $editUserId ? 'readonly' : '' ?>>
-                <label for="username">Имя:</label>
-                <input type="text" id="username" name="username" required maxlength="100"
-                       value="<?= htmlspecialchars($editUsername) ?>">
-                <button type="submit"><?= $editUserId ? 'Обновить' : 'Добавить' ?></button>
-                <?php if ($editUserId): ?>
-                    <a href="?">Отмена</a>
-                <?php endif; ?>
-            </div>
-        </form>
-    </div>
+    <!-- ФОРМА ДОБАВЛЕНИЯ / РЕДАКТИРОВАНИЯ -->
+    <h3><?= $editMode ? 'Редактировать пользователя' : 'Добавить пользователя' ?></h3>
+    <form action="" method="POST">
+        <?php if ($editMode): ?>
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="edit_id" value="<?= htmlspecialchars($editUserId) ?>">
+            <label for="user_id">ID пользователя (изменять нельзя):</label>
+            <input type="text" id="user_id" name="user_id" value="<?= htmlspecialchars($editUserId) ?>" readonly style="background:#e9ecef;">
+        <?php else: ?>
+            <input type="hidden" name="action" value="add">
+            <label for="user_id">ID пользователя:</label>
+            <input type="text" id="user_id" name="user_id" required maxlength="100">
+        <?php endif; ?>
 
-    <!-- Таблица пользователей -->
-    <?php if (count($users) > 0): ?>
+        <label for="username">Имя пользователя:</label>
+        <input type="text" id="username" name="username" required maxlength="100" value="<?= htmlspecialchars($editUsername) ?>">
+
+        <button type="submit"><?= $editMode ? 'Обновить' : 'Сохранить' ?></button>
+        <?php if ($editMode): ?>
+            <a href="?">Отмена</a>
+        <?php endif; ?>
+    </form>
+
+    <!-- ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ -->
+    <h3>Список пользователей</h3>
+    <?php if (isset($pdo) && count($users) > 0): ?>
         <table>
             <thead>
                 <tr>
@@ -227,12 +253,11 @@ try {
                         <td><?= htmlspecialchars($row['user_id']) ?></td>
                         <td><?= htmlspecialchars($row['username']) ?></td>
                         <td class="actions">
-                            <a href="?edit=<?= urlencode($row['user_id']) ?>" title="Редактировать">✏️</a>
-                            <form action="?action=delete" method="POST" class="delete-form" 
-                                  onsubmit="return confirm('Удалить пользователя «<?= htmlspecialchars($row['username']) ?>»?')">
+                            <a href="?edit=<?= urlencode($row['user_id']) ?>" class="btn-edit">✏️ Редактировать</a>
+                            <form action="" method="POST" onsubmit="return confirm('Удалить пользователя ID <?= htmlspecialchars($row['user_id']) ?>?')">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="user_id" value="<?= htmlspecialchars($row['user_id']) ?>">
-                                <button type="submit" title="Удалить">🗑️</button>
+                                <button type="submit" class="btn-delete">🗑️ Удалить</button>
                             </form>
                         </td>
                     </tr>
@@ -240,7 +265,7 @@ try {
             </tbody>
         </table>
     <?php else: ?>
-        <p>Пользователи не найдены.</p>
+        <p>Пользователей пока нет.</p>
     <?php endif; ?>
 </body>
 </html>
