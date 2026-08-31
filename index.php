@@ -1,38 +1,61 @@
 <?php
 
-require __DIR__ . '/vendor/autoload.php';
+$host = 'localhost';
+$db   = 'user_db';
+$user = 'postgres';
+$pass = 'postgres';
 
-use Dotenv\Dotenv;
+// === ПОДКЛЮЧЕНИЕ К БД С СОЗДАНИЕМ БАЗЫ И ТАБЛИЦЫ ===
+try {
+    // Сначала подключаемся без указания базы, чтобы создать её, если нет
+    $pdo = new PDO("pgsql:host=$host", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-$dotenv = Dotenv::createImmutable(__DIR__);
-$dotenv->load();
+    // Проверяем, существует ли база
+    $stmt = $pdo->query("SELECT 1 FROM pg_database WHERE datname = '$db'");
+    if (!$stmt->fetch()) {
+        $pdo->exec("CREATE DATABASE $db");
+        $message = "База данных '$db' создана.<br>";
+    } else {
+        $message = "";
+    }
+    
+    // Подключаемся к базе
+    $pdo = new PDO("pgsql:host=$host;dbname=$db", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
-$host = $_ENV['DB_HOST'];
-$db   = $_ENV['DB_NAME'];
-$user = $_ENV['DB_USER'];
-$pass = $_ENV['DB_PASS'];
+    // Проверяем, существует ли таблица users
+    $stmt = $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_name = 'users'");
+    if (!$stmt->fetch()) {
+        $pdo->exec("CREATE TABLE users (
+            user_id VARCHAR(100) PRIMARY KEY,
+            username VARCHAR(100) NOT NULL
+        )");
+        $message .= "Таблица 'users' создана.";
+    }
+} catch (PDOException $e) {
+    $error = $e->getMessage();
+    if (strpos($error, 'роль "postgres" не существует') !== false) {
+        die("Ошибка: пользователь 'postgres' не существует. 
+             Создайте его командой: 
+             CREATE USER postgres WITH SUPERUSER PASSWORD 'postgres'; 
+             или измените параметры подключения в коде.");
+    } elseif (strpos($error, 'Connection refused') !== false) {
+        die("Ошибка: сервер PostgreSQL не запущен. Запустите его через службы Windows.");
+    } else {
+        die("Ошибка подключения: " . $error);
+    }
+}
 
-$dsn = "pgsql:host=$host;dbname=$db";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
-
-$message = '';
-$messageType = '';
+$message = $message ?? '';
+$messageType = 'success';
 $editUserId = null;
 $editUsername = '';
 
-try {
-    $pdo = new PDO($dsn, $user, $pass, $options);
-} catch (PDOException $e) {
-    die('Ошибка подключения к базе данных: ' . $e->getMessage());
-}
-
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
-//УДАЛЕНИЕ
+// УДАЛЕНИЕ
 if ($action === 'delete' && isset($_POST['user_id'])) {
     $userId = trim($_POST['user_id']);
     if ($userId !== '') {
@@ -74,7 +97,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'delete') {
     $user_id = filter_input(INPUT_POST, 'user_id', FILTER_DEFAULT);
     $username = trim((string)($_POST['username'] ?? ''));
 
-    // Валидация
     if ($user_id === null || $user_id === '' || strlen($user_id) > 100) {
         $message = 'ID пользователя должен быть указан и не превышать 100 символов.';
         $messageType = 'error';
@@ -84,7 +106,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'delete') {
     } else {
         try {
             if ($action === 'edit') {
-                // Обновление
                 $sql = "UPDATE users SET username = :username WHERE user_id = :user_id";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
@@ -93,11 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'delete') {
                 ]);
                 $message = 'Пользователь обновлён!';
                 $messageType = 'success';
-                // Сбрасываем режим редактирования
                 $editUserId = null;
                 $editUsername = '';
             } else {
-                // Добавление
                 $sql = "INSERT INTO users (user_id, username) VALUES (:user_id, :username)";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
@@ -119,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== 'delete') {
     }
 }
 
-// СПИСОК ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
+// СПИСОК ПОЛЬЗОВАТЕЛЕЙ
 $users = [];
 try {
     $stmt = $pdo->query("SELECT user_id, username FROM users ORDER BY user_id");
@@ -157,6 +176,7 @@ try {
         .form-inline button { padding: 6px 16px; }
         .add-form { background: #f9f9f9; padding: 15px; border-radius: 6px; margin-top: 10px; }
         .delete-form { display: inline; }
+        .info { background: #e7f3ff; padding: 10px; margin-top: 10px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -168,7 +188,7 @@ try {
         </div>
     <?php endif; ?>
 
-    <!-- Форма добавления (или редактирования) -->
+    <!-- Форма добавления/редактирования -->
     <div class="add-form">
         <h3><?= $editUserId ? '✏️ Редактировать пользователя' : '➕ Добавить пользователя' ?></h3>
         <form action="?<?= $editUserId ? 'action=edit' : '' ?>" method="POST">
@@ -207,9 +227,7 @@ try {
                         <td><?= htmlspecialchars($row['user_id']) ?></td>
                         <td><?= htmlspecialchars($row['username']) ?></td>
                         <td class="actions">
-                            <!-- Редактировать -->
                             <a href="?edit=<?= urlencode($row['user_id']) ?>" title="Редактировать">✏️</a>
-                            <!-- Удалить (через POST форму) -->
                             <form action="?action=delete" method="POST" class="delete-form" 
                                   onsubmit="return confirm('Удалить пользователя «<?= htmlspecialchars($row['username']) ?>»?')">
                                 <input type="hidden" name="action" value="delete">
