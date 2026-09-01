@@ -1,0 +1,28 @@
+server {
+    listen 8001;
+    server_name 213.189.221.124;
+
+    root /var/www/pam_digest;
+    index index.php;
+
+    access_log /var/log/nginx/pam_digest.access.log;
+    error_log /var/log/nginx/pam_digest.error.log;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT $document_root;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        fastcgi_index index.php;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
