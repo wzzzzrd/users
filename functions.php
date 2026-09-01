@@ -1,5 +1,6 @@
 <?php
-// functions.php – îáùèå ôóíêöèè
+// functions.php â€“ Ð¾Ð±Ñ‰Ð¸Ðµ Ñ„ÑƒÐ½ÐºÑ†Ð¸Ð¸
+
 
 function log_action($pdo, $user_id, $action, $object = null, $details = null) {
     $stmt = $pdo->prepare("INSERT INTO logs (user_id, action, object, details) VALUES (:user_id, :action, :object, :details)");
@@ -14,11 +15,11 @@ function log_action($pdo, $user_id, $action, $object = null, $details = null) {
 function check_role($required_role, $current_role) {
     $roles_hierarchy = ['operator' => 1, 'admin' => 2, 'owner' => 3];
     if (!isset($roles_hierarchy[$current_role]) || $roles_hierarchy[$current_role] < $roles_hierarchy[$required_role]) {
-        die('Äîñòóï çàïðåù¸í.');
+        die('Ð”Ð¾ÑÑ‚ÑƒÐ¿ Ð·Ð°Ð¿Ñ€ÐµÑ‰Ñ‘Ð½.');
     }
 }
 
-// Ôóíêöèÿ äëÿ âûâîäà ñîîáùåíèé (ìîæíî èñïîëüçîâàòü â ëþáîì ôàéëå)
+// Ð¤ÑƒÐ½ÐºÑ†Ð¸Ñ Ð´Ð»Ñ Ð²Ñ‹Ð²Ð¾Ð´Ð° ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ð¹ (Ð¼Ð¾Ð¶Ð½Ð¾ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ Ð² Ð»ÑŽÐ±Ð¾Ð¼ Ñ„Ð°Ð¹Ð»Ðµ)
 function show_message($message, $type = 'info') {
     if ($message) {
         $class = $type === 'success' ? 'success' : ($type === 'error' ? 'error' : 'info');

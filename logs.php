@@ -1,12 +1,13 @@
 <?php
-// logs.php – просмотр журнала действий (только владелец)
+// logs.php вЂ“ РїСЂРѕСЃРјРѕС‚СЂ Р¶СѓСЂРЅР°Р»Р° РґРµР№СЃС‚РІРёР№ (С‚РѕР»СЊРєРѕ РІР»Р°РґРµР»РµС†)
+
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
 
 $current_role = $_SESSION['role'] ?? null;
 if ($current_role !== 'owner') {
-    die('Доступ запрещён.');
+    die('Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰С‘РЅ.');
 }
 
 $logs = [];
@@ -21,7 +22,7 @@ try {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Журнал действий</title>
+    <title>Р–СѓСЂРЅР°Р» РґРµР№СЃС‚РІРёР№</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -36,22 +37,22 @@ try {
 </head>
 <body>
     <div class="header">
-        <h2>?? Журнал действий</h2>
+        <h2>?? Р–СѓСЂРЅР°Р» РґРµР№СЃС‚РІРёР№</h2>
         <div>
             <span><?= htmlspecialchars($_SESSION['username']) ?> (<?= htmlspecialchars($_SESSION['role']) ?>)</span>
-            <a href="?logout=1" style="margin-left:20px;">Выйти</a>
+            <a href="?logout=1" style="margin-left:20px;">Р’С‹Р№С‚Рё</a>
         </div>
     </div>
 
     <div class="tabs">
-        <a href="?users">Пользователи</a>
-        <a href="?logs" class="active">Логи</a>
-        <a href="?action=change_password">Сменить пароль</a>
+        <a href="?users">РџРѕР»СЊР·РѕРІР°С‚РµР»Рё</a>
+        <a href="?logs" class="active">Р›РѕРіРё</a>
+        <a href="?action=change_password">РЎРјРµРЅРёС‚СЊ РїР°СЂРѕР»СЊ</a>
     </div>
 
     <?php if (count($logs) > 0): ?>
         <table>
-            <thead><tr><th>Дата/время</th><th>Пользователь</th><th>Действие</th><th>Объект</th><th>Подробности</th></tr></thead>
+            <thead><tr><th>Р”Р°С‚Р°/РІСЂРµРјСЏ</th><th>РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ</th><th>Р”РµР№СЃС‚РІРёРµ</th><th>РћР±СЉРµРєС‚</th><th>РџРѕРґСЂРѕР±РЅРѕСЃС‚Рё</th></tr></thead>
             <tbody>
             <?php foreach ($logs as $log): ?>
                 <tr>
@@ -65,7 +66,7 @@ try {
             </tbody>
         </table>
     <?php else: ?>
-        <p>Логов пока нет.</p>
+        <p>Р›РѕРіРѕРІ РїРѕРєР° РЅРµС‚.</p>
     <?php endif; ?>
 </body>
 </html>

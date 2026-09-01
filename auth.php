@@ -1,7 +1,7 @@
 <?php
-// auth.php – авторизация, выход, смена пароля
+// auth.php вЂ“ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ, РІС‹С…РѕРґ, СЃРјРµРЅР° РїР°СЂРѕР»СЏ
 
-// Подключаем конфиг и функции
+// РџРѕРґРєР»СЋС‡Р°РµРј РєРѕРЅС„РёРі Рё С„СѓРЅРєС†РёРё
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
 
@@ -9,17 +9,17 @@ $current_user = $_SESSION['user_id'] ?? null;
 $message = '';
 $messageType = '';
 
-// Выход
+// Р’С‹С…РѕРґ
 if (isset($_GET['logout'])) {
     if ($current_user) {
-        log_action($pdo, $current_user, 'logout', null, 'Выход из системы');
+        log_action($pdo, $current_user, 'logout', null, 'Р’С‹С…РѕРґ РёР· СЃРёСЃС‚РµРјС‹');
     }
     session_destroy();
     header('Location: ?');
     exit;
 }
 
-// Обработка логина
+// РћР±СЂР°Р±РѕС‚РєР° Р»РѕРіРёРЅР°
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     $user_id = trim($_POST['user_id'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             $_SESSION['role'] = $userData['role'];
             $_SESSION['force_password_change'] = $userData['force_password_change'];
 
-            log_action($pdo, $userData['user_id'], 'login', null, 'Успешный вход');
+            log_action($pdo, $userData['user_id'], 'login', null, 'РЈСЃРїРµС€РЅС‹Р№ РІС…РѕРґ');
 
             if ($userData['force_password_change']) {
                 header('Location: ?action=change_password');
@@ -44,16 +44,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             header('Location: ?');
             exit;
         } else {
-            $message = 'Неверный логин или пароль.';
+            $message = 'РќРµРІРµСЂРЅС‹Р№ Р»РѕРіРёРЅ РёР»Рё РїР°СЂРѕР»СЊ.';
             $messageType = 'error';
         }
     } else {
-        $message = 'Заполните все поля.';
+        $message = 'Р—Р°РїРѕР»РЅРёС‚Рµ РІСЃРµ РїРѕР»СЏ.';
         $messageType = 'error';
     }
 }
 
-// Смена пароля (своя или принудительная)
+// РЎРјРµРЅР° РїР°СЂРѕР»СЏ (СЃРІРѕСЏ РёР»Рё РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅР°СЏ)
 if (isset($_GET['action']) && $_GET['action'] === 'change_password') {
     if (!$current_user) {
         header('Location: ?');
@@ -66,40 +66,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'change_password') {
         $confirm_password = $_POST['confirm_password'] ?? '';
 
         if (strlen($new_password) < 6) {
-            $message = 'Пароль должен быть не менее 6 символов.';
+            $message = 'РџР°СЂРѕР»СЊ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РЅРµ РјРµРЅРµРµ 6 СЃРёРјРІРѕР»РѕРІ.';
             $messageType = 'error';
         } elseif ($new_password !== $confirm_password) {
-            $message = 'Пароли не совпадают.';
+            $message = 'РџР°СЂРѕР»Рё РЅРµ СЃРѕРІРїР°РґР°СЋС‚.';
             $messageType = 'error';
         } else {
             if ($target_user !== $current_user && $_SESSION['role'] !== 'owner') {
-                die('Недостаточно прав.');
+                die('РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РїСЂР°РІ.');
             }
             $hash = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password_hash = :hash, force_password_change = FALSE, last_password_change = NOW() WHERE user_id = :user_id");
             $stmt->execute([':hash' => $hash, ':user_id' => $target_user]);
 
-            log_action($pdo, $current_user, 'change_password', $target_user, 'Смена пароля');
+            log_action($pdo, $current_user, 'change_password', $target_user, 'РЎРјРµРЅР° РїР°СЂРѕР»СЏ');
 
             if ($target_user === $current_user) {
                 $_SESSION['force_password_change'] = false;
-                $message = 'Пароль успешно изменён.';
+                $message = 'РџР°СЂРѕР»СЊ СѓСЃРїРµС€РЅРѕ РёР·РјРµРЅС‘РЅ.';
                 $messageType = 'success';
                 header('Location: ?');
                 exit;
             } else {
-                $message = "Пароль для пользователя $target_user изменён.";
+                $message = "РџР°СЂРѕР»СЊ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ $target_user РёР·РјРµРЅС‘РЅ.";
                 $messageType = 'success';
-                // Остаёмся на странице, чтобы можно было продолжать
+                // РћСЃС‚Р°С‘РјСЃСЏ РЅР° СЃС‚СЂР°РЅРёС†Рµ, С‡С‚РѕР±С‹ РјРѕР¶РЅРѕ Р±С‹Р»Рѕ РїСЂРѕРґРѕР»Р¶Р°С‚СЊ
             }
         }
     }
 
-    // Вывод формы смены пароля
+    // Р’С‹РІРѕРґ С„РѕСЂРјС‹ СЃРјРµРЅС‹ РїР°СЂРѕР»СЏ
     ?>
     <!DOCTYPE html>
     <html>
-    <head><meta charset="UTF-8"><title>Смена пароля</title>
+    <head><meta charset="UTF-8"><title>РЎРјРµРЅР° РїР°СЂРѕР»СЏ</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
         .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
@@ -110,29 +110,29 @@ if (isset($_GET['action']) && $_GET['action'] === 'change_password') {
     </style>
     </head>
     <body>
-        <h2>Смена пароля</h2>
+        <h2>РЎРјРµРЅР° РїР°СЂРѕР»СЏ</h2>
         <?php if ($message): ?>
             <div class="message <?= $messageType ?>"><?= htmlspecialchars($message) ?></div>
         <?php endif; ?>
         <form method="POST">
             <input type="hidden" name="change_password" value="1">
-            <label>Новый пароль: <input type="password" name="new_password" required></label>
-            <label>Подтвердите: <input type="password" name="confirm_password" required></label>
-            <button type="submit">Изменить пароль</button>
+            <label>РќРѕРІС‹Р№ РїР°СЂРѕР»СЊ: <input type="password" name="new_password" required></label>
+            <label>РџРѕРґС‚РІРµСЂРґРёС‚Рµ: <input type="password" name="confirm_password" required></label>
+            <button type="submit">РР·РјРµРЅРёС‚СЊ РїР°СЂРѕР»СЊ</button>
         </form>
-        <a href="?">На главную</a>
+        <a href="?">РќР° РіР»Р°РІРЅСѓСЋ</a>
     </body>
     </html>
     <?php
     exit;
 }
 
-// Если пользователь не авторизован – показываем форму логина
+// Р•СЃР»Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ вЂ“ РїРѕРєР°Р·С‹РІР°РµРј С„РѕСЂРјСѓ Р»РѕРіРёРЅР°
 if (!$current_user) {
     ?>
     <!DOCTYPE html>
     <html>
-    <head><meta charset="UTF-8"><title>Авторизация</title>
+    <head><meta charset="UTF-8"><title>РђРІС‚РѕСЂРёР·Р°С†РёСЏ</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
         .error { color: red; }
@@ -140,15 +140,15 @@ if (!$current_user) {
     </style>
     </head>
     <body>
-        <h2>Вход в систему</h2>
+        <h2>Р’С…РѕРґ РІ СЃРёСЃС‚РµРјСѓ</h2>
         <?php if ($message): ?>
             <div class="<?= $messageType ?>"><?= htmlspecialchars($message) ?></div>
         <?php endif; ?>
         <form method="POST">
             <input type="hidden" name="login" value="1">
-            <input type="text" name="user_id" placeholder="Логин" required>
-            <input type="password" name="password" placeholder="Пароль" required>
-            <button type="submit">Войти</button>
+            <input type="text" name="user_id" placeholder="Р›РѕРіРёРЅ" required>
+            <input type="password" name="password" placeholder="РџР°СЂРѕР»СЊ" required>
+            <button type="submit">Р’РѕР№С‚Рё</button>
         </form>
     </body>
     </html>
@@ -156,5 +156,5 @@ if (!$current_user) {
     exit;
 }
 
-// Если всё ок – возвращаем управление (роутер продолжит)
+// Р•СЃР»Рё РІСЃС‘ РѕРє вЂ“ РІРѕР·РІСЂР°С‰Р°РµРј СѓРїСЂР°РІР»РµРЅРёРµ (СЂРѕСѓС‚РµСЂ РїСЂРѕРґРѕР»Р¶РёС‚)
 return;

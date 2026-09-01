@@ -1,5 +1,5 @@
 <?php
-// config.php – подключение к БД и миграция
+// config.php вЂ“ РїРѕРґРєР»СЋС‡РµРЅРёРµ Рє Р‘Р” Рё РјРёРіСЂР°С†РёСЏ
 
 $host = 'localhost';
 $db   = 'user_db';
@@ -15,13 +15,15 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
+    // РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј РєР»РёРµРЅС‚СЃРєСѓСЋ РєРѕРґРёСЂРѕРІРєСѓ UTF-8
+    $pdo->exec("SET client_encoding TO 'UTF8'");
 } catch (PDOException $e) {
-    die('Ошибка подключения к БД: ' . $e->getMessage());
+    die('РћС€РёР±РєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє Р‘Р”: ' . $e->getMessage());
 }
 
-// Автоматическая миграция (проверка и создание таблиц/столбцов)
+// РђРІС‚РѕРјР°С‚РёС‡РµСЃРєР°СЏ РјРёРіСЂР°С†РёСЏ
 function migrateDatabase($pdo) {
-    // Проверка таблицы users
+    // РџСЂРѕРІРµСЂРєР° С‚Р°Р±Р»РёС†С‹ users
     $tableExists = $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_name='users'")->fetch();
     if (!$tableExists) {
         $pdo->exec("
@@ -36,31 +38,32 @@ function migrateDatabase($pdo) {
             )
         ");
         $hash = password_hash('owner123', PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare("INSERT INTO users (user_id, username, password_hash, role) VALUES ('owner', 'Владелец', :hash, 'owner')");
+        $stmt = $pdo->prepare("INSERT INTO users (user_id, username, password_hash, role) VALUES ('owner', 'Р’Р»Р°РґРµР»РµС†', :hash, 'owner')");
         $stmt->execute([':hash' => $hash]);
     } else {
         $columns = $pdo->query("SELECT column_name FROM information_schema.columns WHERE table_name='users'")->fetchAll(PDO::FETCH_COLUMN);
         $needed = ['password_hash', 'role', 'force_password_change', 'created_at', 'last_password_change'];
         foreach ($needed as $col) {
             if (!in_array($col, $columns)) {
-                $pdo->exec("ALTER TABLE users ADD COLUMN $col " . match($col) {
+                $type = match($col) {
                     'password_hash' => 'VARCHAR(255)',
                     'role' => "VARCHAR(20) DEFAULT 'operator'",
                     'force_password_change' => 'BOOLEAN DEFAULT FALSE',
                     'created_at' => 'TIMESTAMP DEFAULT NOW()',
                     'last_password_change' => 'TIMESTAMP',
-                });
+                };
+                $pdo->exec("ALTER TABLE users ADD COLUMN $col $type");
             }
         }
-        // Проверяем наличие владельца
+        // РџСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ РІР»Р°РґРµР»СЊС†Р°
         $owner = $pdo->query("SELECT 1 FROM users WHERE user_id='owner'")->fetch();
         if (!$owner) {
             $hash = password_hash('owner123', PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (user_id, username, password_hash, role) VALUES ('owner', 'Владелец', :hash, 'owner')");
+            $stmt = $pdo->prepare("INSERT INTO users (user_id, username, password_hash, role) VALUES ('owner', 'Р’Р»Р°РґРµР»РµС†', :hash, 'owner')");
             $stmt->execute([':hash' => $hash]);
         }
     }
-    // Таблица логов
+    // РўР°Р±Р»РёС†Р° Р»РѕРіРѕРІ
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS logs (
             id SERIAL PRIMARY KEY,
@@ -75,7 +78,7 @@ function migrateDatabase($pdo) {
 
 migrateDatabase($pdo);
 
-// Запускаем сессию (здесь или в index.php)
+// Р—Р°РїСѓСЃРєР°РµРј СЃРµСЃСЃРёСЋ
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

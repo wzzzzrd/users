@@ -1,5 +1,6 @@
 <?php
-// users.php – управление пользователями (список, добавление, редактирование, удаление)
+// users.php вЂ“ СѓРїСЂР°РІР»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё (СЃРїРёСЃРѕРє, РґРѕР±Р°РІР»РµРЅРёРµ, СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРµ, СѓРґР°Р»РµРЅРёРµ)
+
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
@@ -9,32 +10,32 @@ $current_role = $_SESSION['role'] ?? null;
 $message = '';
 $messageType = '';
 
-// Проверка роли: доступно admin и owner
+// РџСЂРѕРІРµСЂРєР° СЂРѕР»Рё: РґРѕСЃС‚СѓРїРЅРѕ admin Рё owner
 if (!in_array($current_role, ['admin', 'owner'])) {
-    die('Доступ запрещён.');
+    die('Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰С‘РЅ.');
 }
 
-// Обработка удаления
+// РћР±СЂР°Р±РѕС‚РєР° СѓРґР°Р»РµРЅРёСЏ
 if (isset($_POST['action']) && $_POST['action'] === 'delete' && isset($_POST['user_id'])) {
     $userId = trim($_POST['user_id']);
     if ($userId === $current_user) {
-        $message = 'Нельзя удалить самого себя.';
+        $message = 'РќРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ СЃР°РјРѕРіРѕ СЃРµР±СЏ.';
         $messageType = 'error';
     } elseif ($userId) {
         try {
             $stmt = $pdo->prepare("DELETE FROM users WHERE user_id = :user_id");
             $stmt->execute([':user_id' => $userId]);
-            log_action($pdo, $current_user, 'delete_user', $userId, "Удалён пользователь $userId");
-            $message = 'Пользователь удалён.';
+            log_action($pdo, $current_user, 'delete_user', $userId, "РЈРґР°Р»С‘РЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ $userId");
+            $message = 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓРґР°Р»С‘РЅ.';
             $messageType = 'success';
         } catch (PDOException $e) {
-            $message = 'Ошибка при удалении: ' . $e->getMessage();
+            $message = 'РћС€РёР±РєР° РїСЂРё СѓРґР°Р»РµРЅРёРё: ' . $e->getMessage();
             $messageType = 'error';
         }
     }
 }
 
-// Загрузка данных для редактирования
+// Р—Р°РіСЂСѓР·РєР° РґР°РЅРЅС‹С… РґР»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ
 $editUserId = null;
 $editUsername = '';
 $editRole = '';
@@ -50,13 +51,13 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
         $editRole = $userData['role'];
         $editForceChange = $userData['force_password_change'];
     } else {
-        $message = 'Пользователь не найден.';
+        $message = 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ.';
         $messageType = 'error';
         $editUserId = null;
     }
 }
 
-// Добавление / обновление
+// Р”РѕР±Р°РІР»РµРЅРёРµ / РѕР±РЅРѕРІР»РµРЅРёРµ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_user'])) {
     $user_id = trim($_POST['user_id'] ?? '');
     $username = trim($_POST['username'] ?? '');
@@ -65,16 +66,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_user'])) {
     $force_change = isset($_POST['force_change']) ? true : false;
 
     if (!$user_id || strlen($user_id) > 100) {
-        $message = 'ID пользователя обязателен и не более 100 символов.';
+        $message = 'ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РѕР±СЏР·Р°С‚РµР»РµРЅ Рё РЅРµ Р±РѕР»РµРµ 100 СЃРёРјРІРѕР»РѕРІ.';
         $messageType = 'error';
     } elseif (strlen($username) < 1 || strlen($username) > 100) {
-        $message = 'Имя должно быть от 1 до 100 символов.';
+        $message = 'РРјСЏ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РѕС‚ 1 РґРѕ 100 СЃРёРјРІРѕР»РѕРІ.';
         $messageType = 'error';
     } else {
         if ($editUserId) {
-            // Обновление
+            // РћР±РЅРѕРІР»РµРЅРёРµ
             if ($current_role !== 'owner' && $role !== $_POST['old_role']) {
-                $message = 'Только владелец может менять роли.';
+                $message = 'РўРѕР»СЊРєРѕ РІР»Р°РґРµР»РµС† РјРѕР¶РµС‚ РјРµРЅСЏС‚СЊ СЂРѕР»Рё.';
                 $messageType = 'error';
             } else {
                 $sql = "UPDATE users SET username = :username, role = :role, force_password_change = :force_change WHERE user_id = :user_id";
@@ -90,24 +91,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_user'])) {
                 }
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
-                log_action($pdo, $current_user, 'edit_user', $user_id, "Изменены данные пользователя $user_id");
-                $message = 'Пользователь обновлён!';
+                log_action($pdo, $current_user, 'edit_user', $user_id, "РР·РјРµРЅРµРЅС‹ РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ $user_id");
+                $message = 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕР±РЅРѕРІР»С‘РЅ!';
                 $messageType = 'success';
-                // Сброс режима редактирования
+                // РЎР±СЂРѕСЃ СЂРµР¶РёРјР° СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ
                 $editUserId = null;
                 $editUsername = '';
                 $editRole = '';
                 $editForceChange = false;
-                // Перенаправляем, чтобы избежать повторной отправки
+                // РџРµСЂРµРЅР°РїСЂР°РІР»СЏРµРј, С‡С‚РѕР±С‹ РёР·Р±РµР¶Р°С‚СЊ РїРѕРІС‚РѕСЂРЅРѕР№ РѕС‚РїСЂР°РІРєРё
                 header('Location: ?users');
                 exit;
             }
         } else {
-            // Добавление нового
+            // Р”РѕР±Р°РІР»РµРЅРёРµ РЅРѕРІРѕРіРѕ
             $check = $pdo->prepare("SELECT 1 FROM users WHERE user_id = :user_id");
             $check->execute([':user_id' => $user_id]);
             if ($check->fetch()) {
-                $message = 'Пользователь с таким ID уже существует.';
+                $message = 'РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј ID СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.';
                 $messageType = 'error';
             } else {
                 if (empty($password)) {
@@ -123,10 +124,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_user'])) {
                     ':role' => $role,
                     ':force_change' => $force_change ? 'true' : 'false',
                 ]);
-                log_action($pdo, $current_user, 'add_user', $user_id, "Добавлен пользователь $user_id");
-                $message = "Пользователь добавлен! Пароль: $password";
+                log_action($pdo, $current_user, 'add_user', $user_id, "Р”РѕР±Р°РІР»РµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ $user_id");
+                $message = "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РґРѕР±Р°РІР»РµРЅ! РџР°СЂРѕР»СЊ: $password";
                 $messageType = 'success';
-                // Перенаправление, чтобы очистить POST
+                // РџРµСЂРµРЅР°РїСЂР°РІР»РµРЅРёРµ, С‡С‚РѕР±С‹ РѕС‡РёСЃС‚РёС‚СЊ POST
                 header('Location: ?users');
                 exit;
             }
@@ -134,23 +135,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_user'])) {
     }
 }
 
-// Получение списка пользователей
+// РџРѕР»СѓС‡РµРЅРёРµ СЃРїРёСЃРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
 $users = [];
 try {
     $stmt = $pdo->query("SELECT user_id, username, role, force_password_change, last_password_change FROM users ORDER BY user_id");
     $users = $stmt->fetchAll();
 } catch (PDOException $e) {
-    $message = 'Ошибка загрузки списка пользователей: ' . $e->getMessage();
+    $message = 'РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№: ' . $e->getMessage();
     $messageType = 'error';
 }
 
-// Вывод HTML
+// Р’С‹РІРѕРґ HTML
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Управление пользователями</title>
+    <title>РЈРїСЂР°РІР»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
         .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
@@ -181,10 +182,10 @@ try {
 </head>
 <body>
     <div class="header">
-        <h2>?? Управление пользователями</h2>
+        <h2>?? РЈРїСЂР°РІР»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё</h2>
         <div class="user-info">
             <span><?= htmlspecialchars($_SESSION['username']) ?> (<?= htmlspecialchars($current_role) ?>)</span>
-            <a href="?logout=1" class="logout">Выйти</a>
+            <a href="?logout=1" class="logout">Р’С‹Р№С‚Рё</a>
         </div>
     </div>
 
@@ -193,18 +194,18 @@ try {
     <?php endif; ?>
 
     <div class="tabs">
-        <a href="?users" class="active">Пользователи</a>
+        <a href="?users" class="active">РџРѕР»СЊР·РѕРІР°С‚РµР»Рё</a>
         <?php if ($current_role === 'owner'): ?>
-            <a href="?logs">Логи</a>
+            <a href="?logs">Р›РѕРіРё</a>
         <?php endif; ?>
         <?php if ($current_role === 'owner' || $current_role === 'admin'): ?>
-            <a href="?action=change_password">Сменить пароль</a>
+            <a href="?action=change_password">РЎРјРµРЅРёС‚СЊ РїР°СЂРѕР»СЊ</a>
         <?php endif; ?>
     </div>
 
-    <!-- Форма добавления/редактирования -->
+    <!-- Р¤РѕСЂРјР° РґРѕР±Р°РІР»РµРЅРёСЏ/СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ -->
     <div class="add-form">
-        <h3><?= $editUserId ? '?? Редактировать пользователя' : '? Добавить пользователя' ?></h3>
+        <h3><?= $editUserId ? '?? Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ' : '? Р”РѕР±Р°РІРёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ' ?></h3>
         <form method="POST" action="?users">
             <input type="hidden" name="save_user" value="1">
             <?php if ($editUserId): ?>
@@ -215,44 +216,44 @@ try {
                 <input type="text" id="user_id" name="user_id" required
                        value="<?= htmlspecialchars($editUserId ?? '') ?>"
                        <?= $editUserId ? 'readonly' : '' ?>>
-                <label for="username">Имя:</label>
+                <label for="username">РРјСЏ:</label>
                 <input type="text" id="username" name="username" required maxlength="100"
                        value="<?= htmlspecialchars($editUsername) ?>">
                 <?php if ($editUserId && $current_role === 'owner'): ?>
-                    <label for="role">Роль:</label>
+                    <label for="role">Р РѕР»СЊ:</label>
                     <select id="role" name="role">
-                        <option value="owner" <?= $editRole === 'owner' ? 'selected' : '' ?>>Владелец</option>
-                        <option value="admin" <?= $editRole === 'admin' ? 'selected' : '' ?>>Администратор</option>
-                        <option value="operator" <?= $editRole === 'operator' ? 'selected' : '' ?>>Оператор</option>
+                        <option value="owner" <?= $editRole === 'owner' ? 'selected' : '' ?>>Р’Р»Р°РґРµР»РµС†</option>
+                        <option value="admin" <?= $editRole === 'admin' ? 'selected' : '' ?>>РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ</option>
+                        <option value="operator" <?= $editRole === 'operator' ? 'selected' : '' ?>>РћРїРµСЂР°С‚РѕСЂ</option>
                     </select>
                 <?php else: ?>
                     <input type="hidden" name="role" value="<?= $editRole ?: 'operator' ?>">
                 <?php endif; ?>
                 <?php if ($editUserId && $current_role === 'owner'): ?>
-                    <label><input type="checkbox" name="force_change" <?= $editForceChange ? 'checked' : '' ?>> Принудительная смена пароля</label>
+                    <label><input type="checkbox" name="force_change" <?= $editForceChange ? 'checked' : '' ?>> РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅР°СЏ СЃРјРµРЅР° РїР°СЂРѕР»СЏ</label>
                 <?php endif; ?>
                 <?php if (!$editUserId): ?>
-                    <label for="password">Пароль (оставьте пустым для генерации):</label>
+                    <label for="password">РџР°СЂРѕР»СЊ (РѕСЃС‚Р°РІСЊС‚Рµ РїСѓСЃС‚С‹Рј РґР»СЏ РіРµРЅРµСЂР°С†РёРё):</label>
                     <input type="text" id="password" name="password">
                 <?php endif; ?>
-                <button type="submit"><?= $editUserId ? 'Обновить' : 'Добавить' ?></button>
+                <button type="submit"><?= $editUserId ? 'РћР±РЅРѕРІРёС‚СЊ' : 'Р”РѕР±Р°РІРёС‚СЊ' ?></button>
                 <?php if ($editUserId): ?>
-                    <a href="?users">Отмена</a>
+                    <a href="?users">РћС‚РјРµРЅР°</a>
                 <?php endif; ?>
             </div>
         </form>
     </div>
 
-    <!-- Таблица пользователей -->
+    <!-- РўР°Р±Р»РёС†Р° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ -->
     <?php if (count($users) > 0): ?>
         <table>
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Имя</th>
-                    <th>Роль</th>
-                    <th>Статус пароля</th>
-                    <th>Действия</th>
+                    <th>РРјСЏ</th>
+                    <th>Р РѕР»СЊ</th>
+                    <th>РЎС‚Р°С‚СѓСЃ РїР°СЂРѕР»СЏ</th>
+                    <th>Р”РµР№СЃС‚РІРёСЏ</th>
                 </tr>
             </thead>
             <tbody>
@@ -267,28 +268,28 @@ try {
                         </td>
                         <td>
                             <?php if ($row['force_password_change']): ?>
-                                <span class="status-warn">?? Требуется смена</span>
+                                <span class="status-warn">?? РўСЂРµР±СѓРµС‚СЃСЏ СЃРјРµРЅР°</span>
                             <?php else: ?>
-                                <span class="status-ok">? Установлен</span>
+                                <span class="status-ok">? РЈСЃС‚Р°РЅРѕРІР»РµРЅ</span>
                                 <?php if ($row['last_password_change']): ?>
-                                    <br><small>с <?= htmlspecialchars(date('d.m.Y', strtotime($row['last_password_change']))) ?></small>
+                                    <br><small>СЃ <?= htmlspecialchars(date('d.m.Y', strtotime($row['last_password_change']))) ?></small>
                                 <?php endif; ?>
                             <?php endif; ?>
                         </td>
                         <td class="actions">
                             <?php if ($current_role === 'admin' || $current_role === 'owner'): ?>
-                                <a href="?edit=<?= urlencode($row['user_id']) ?>" title="Редактировать">??</a>
+                                <a href="?edit=<?= urlencode($row['user_id']) ?>" title="Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ">??</a>
                                 <?php if ($row['user_id'] !== $current_user): ?>
-                                    <form action="?users" method="POST" class="delete-form" onsubmit="return confirm('Удалить пользователя?')">
+                                    <form action="?users" method="POST" class="delete-form" onsubmit="return confirm('РЈРґР°Р»РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ?')">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="user_id" value="<?= htmlspecialchars($row['user_id']) ?>">
-                                        <button type="submit" title="Удалить">???</button>
+                                        <button type="submit" title="РЈРґР°Р»РёС‚СЊ">???</button>
                                     </form>
                                 <?php endif; ?>
                             <?php endif; ?>
                             <?php if ($current_role === 'owner' && $row['user_id'] !== $current_user): ?>
-                                <a href="?force_change=<?= urlencode($row['user_id']) ?>" title="Принудительная смена пароля" onclick="return confirm('Установить принудительную смену пароля?')">??</a>
-                                <a href="?action=change_password&user=<?= urlencode($row['user_id']) ?>" title="Сменить пароль за пользователя">??</a>
+                                <a href="?force_change=<?= urlencode($row['user_id']) ?>" title="РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅР°СЏ СЃРјРµРЅР° РїР°СЂРѕР»СЏ" onclick="return confirm('РЈСЃС‚Р°РЅРѕРІРёС‚СЊ РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅСѓСЋ СЃРјРµРЅСѓ РїР°СЂРѕР»СЏ?')">??</a>
+                                <a href="?action=change_password&user=<?= urlencode($row['user_id']) ?>" title="РЎРјРµРЅРёС‚СЊ РїР°СЂРѕР»СЊ Р·Р° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ">??</a>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -296,7 +297,7 @@ try {
             </tbody>
         </table>
     <?php else: ?>
-        <p>Пользователи не найдены.</p>
+        <p>РџРѕР»СЊР·РѕРІР°С‚РµР»Рё РЅРµ РЅР°Р№РґРµРЅС‹.</p>
     <?php endif; ?>
 </body>
 </html>
