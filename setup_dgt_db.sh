@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Настройки подключения
+# РќР°СЃС‚СЂРѕР№РєРё РїРѕРґРєР»СЋС‡РµРЅРёСЏ
 PGPASSWORD=postgres
 export PGPASSWORD
 DB_HOST=localhost
@@ -8,77 +8,77 @@ DB_USER=postgres
 DB_PORT=5432
 DB_NAME=user_db
 
-# Цвета для вывода (опционально)
+# Р¦РІРµС‚Р° РґР»СЏ РІС‹РІРѕРґР° (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo "============================================================"
-echo "  Настройка базы данных для управления пользователями"
+echo "  РќР°СЃС‚СЂРѕР№РєР° Р±Р°Р·С‹ РґР°РЅРЅС‹С… РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё"
 echo "============================================================"
 echo ""
 
-# 1. Проверка наличия psql
-echo -e "[1/4] Проверка утилиты psql..."
+# 1. РџСЂРѕРІРµСЂРєР° РЅР°Р»РёС‡РёСЏ psql
+echo -e "[1/4] РџСЂРѕРІРµСЂРєР° СѓС‚РёР»РёС‚С‹ psql..."
 if ! command -v psql &> /dev/null; then
-    echo -e "${RED}[ОШИБКА] psql не найдена. Установите postgresql-client.${NC}"
+    echo -e "${RED}[РћРЁРР‘РљРђ] psql РЅРµ РЅР°Р№РґРµРЅР°. РЈСЃС‚Р°РЅРѕРІРёС‚Рµ postgresql-client.${NC}"
     exit 1
 fi
-echo -e "  ${GREEN}psql найдена.${NC}"
+echo -e "  ${GREEN}psql РЅР°Р№РґРµРЅР°.${NC}"
 echo ""
 
-# 2. Проверка подключения
-echo "[2/4] Проверка подключения к PostgreSQL..."
+# 2. РџСЂРѕРІРµСЂРєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ
+echo "[2/4] РџСЂРѕРІРµСЂРєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє PostgreSQL..."
 if ! psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d postgres -c "SELECT 1" &> /dev/null; then
-    echo -e "${RED}[ОШИБКА] Не удалось подключиться к PostgreSQL.${NC}"
-    echo "Выполняю пробную команду для отображения ошибки:"
+    echo -e "${RED}[РћРЁРР‘РљРђ] РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРєР»СЋС‡РёС‚СЊСЃСЏ Рє PostgreSQL.${NC}"
+    echo "Р’С‹РїРѕР»РЅСЏСЋ РїСЂРѕР±РЅСѓСЋ РєРѕРјР°РЅРґСѓ РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РѕС€РёР±РєРё:"
     psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d postgres -c "SELECT 1"
     exit 1
 fi
-echo -e "  ${GREEN}Подключение успешно.${NC}"
+echo -e "  ${GREEN}РџРѕРґРєР»СЋС‡РµРЅРёРµ СѓСЃРїРµС€РЅРѕ.${NC}"
 echo ""
 
-# 3. Проверка существования базы данных (правильная логика)
-echo "[3/4] Проверка базы данных \"$DB_NAME\"..."
+# 3. РџСЂРѕРІРµСЂРєР° СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёСЏ Р±Р°Р·С‹ РґР°РЅРЅС‹С… (РїСЂР°РІРёР»СЊРЅР°СЏ Р»РѕРіРёРєР°)
+echo "[3/4] РџСЂРѕРІРµСЂРєР° Р±Р°Р·С‹ РґР°РЅРЅС‹С… \"$DB_NAME\"..."
 DB_EXISTS=$(psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d postgres -tA -c "SELECT 1 FROM pg_database WHERE datname='$DB_NAME';")
 if [ "$DB_EXISTS" == "1" ]; then
-    echo -e "  ${YELLOW}База данных \"$DB_NAME\" уже существует.${NC}"
+    echo -e "  ${YELLOW}Р‘Р°Р·Р° РґР°РЅРЅС‹С… \"$DB_NAME\" СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.${NC}"
 else
-    echo -e "  ${YELLOW}База данных не найдена. Создаём...${NC}"
+    echo -e "  ${YELLOW}Р‘Р°Р·Р° РґР°РЅРЅС‹С… РЅРµ РЅР°Р№РґРµРЅР°. РЎРѕР·РґР°С‘Рј...${NC}"
     if ! psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d postgres -c "CREATE DATABASE $DB_NAME;" &> /dev/null; then
-        echo -e "${RED}[ОШИБКА] Не удалось создать базу данных.${NC}"
+        echo -e "${RED}[РћРЁРР‘РљРђ] РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ Р±Р°Р·Сѓ РґР°РЅРЅС‹С….${NC}"
         psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d postgres -c "CREATE DATABASE $DB_NAME;"
         exit 1
     fi
-    echo -e "  ${GREEN}База данных \"$DB_NAME\" успешно создана.${NC}"
+    echo -e "  ${GREEN}Р‘Р°Р·Р° РґР°РЅРЅС‹С… \"$DB_NAME\" СѓСЃРїРµС€РЅРѕ СЃРѕР·РґР°РЅР°.${NC}"
 fi
 echo ""
 
-# 4. Проверка таблицы users
-echo "[4/4] Проверка таблицы users..."
+# 4. РџСЂРѕРІРµСЂРєР° С‚Р°Р±Р»РёС†С‹ users
+echo "[4/4] РџСЂРѕРІРµСЂРєР° С‚Р°Р±Р»РёС†С‹ users..."
 TABLE_EXISTS=$(psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -tA -c "SELECT 1 FROM information_schema.tables WHERE table_name='users';")
 if [ "$TABLE_EXISTS" == "1" ]; then
-    echo -e "  ${YELLOW}Таблица users уже существует.${NC}"
+    echo -e "  ${YELLOW}РўР°Р±Р»РёС†Р° users СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.${NC}"
 else
-    echo -e "  ${YELLOW}Таблица users не найдена. Создаём...${NC}"
+    echo -e "  ${YELLOW}РўР°Р±Р»РёС†Р° users РЅРµ РЅР°Р№РґРµРЅР°. РЎРѕР·РґР°С‘Рј...${NC}"
     if ! psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -c "CREATE TABLE users (user_id VARCHAR(100) PRIMARY KEY, username VARCHAR(100) NOT NULL);" &> /dev/null; then
-        echo -e "${RED}[ОШИБКА] Не удалось создать таблицу users.${NC}"
+        echo -e "${RED}[РћРЁРР‘РљРђ] РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ С‚Р°Р±Р»РёС†Сѓ users.${NC}"
         psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -c "CREATE TABLE users (user_id VARCHAR(100) PRIMARY KEY, username VARCHAR(100) NOT NULL);"
         exit 1
     fi
-    echo -e "  ${GREEN}Таблица users успешно создана.${NC}"
+    echo -e "  ${GREEN}РўР°Р±Р»РёС†Р° users СѓСЃРїРµС€РЅРѕ СЃРѕР·РґР°РЅР°.${NC}"
 fi
 echo ""
 
-# Вывод количества записей (опционально)
+# Р’С‹РІРѕРґ РєРѕР»РёС‡РµСЃС‚РІР° Р·Р°РїРёСЃРµР№ (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
 COUNT=$(psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -tA -c "SELECT COUNT(*) FROM users;" 2>/dev/null)
 if [ -z "$COUNT" ]; then
     COUNT=0
 fi
-echo -e "  В таблице ${GREEN}$COUNT${NC} записей."
+echo -e "  Р’ С‚Р°Р±Р»РёС†Рµ ${GREEN}$COUNT${NC} Р·Р°РїРёСЃРµР№."
 echo ""
 
 echo "============================================================"
-echo -e "${GREEN}  Настройка завершена успешно!${NC}"
+echo -e "${GREEN}  РќР°СЃС‚СЂРѕР№РєР° Р·Р°РІРµСЂС€РµРЅР° СѓСЃРїРµС€РЅРѕ!${NC}"
 echo "============================================================"
